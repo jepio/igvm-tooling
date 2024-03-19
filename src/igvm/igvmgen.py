@@ -197,6 +197,7 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv[1:]))
-    except Exception:
+    except Exception as e:
         # return non-zero exit status in case of an unhandled exception
+        raise e
         sys.exit(1)

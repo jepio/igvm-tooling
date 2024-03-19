@@ -361,6 +361,7 @@ class IGVMHeaders:
         assert(len(page) == PGSIZE)
         if pagetype in self._MEASURED_PAGE_TYPES:
             digest = sha384(page).digest() if any(page) else self._ZERO_DIGEST
+        #print("%x %s %d" % (gpa, "data" if any(page) else "zero", pagetype))
         info = SNP_PAGE_INFO(
             (c_uint8 * 48)(*self.curr_digest),
             (c_uint8 * 48)(*digest),
