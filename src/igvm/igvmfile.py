@@ -409,8 +409,48 @@ class IGVMHeaders:
         ans = []
         ans.append(dumps(header))
         offset = header.VariableHeaderOffset
+        id_block = None
+        header_ = None
+        zeropage = b'\x00' * PGSIZE
         while offset < header.VariableHeaderOffset + header.VariableHeaderSize:
             varheader = IGVM_VHS_VARIABLE_HEADER.from_buffer_copy(raw, offset)
+
+            if varheader.Type == IGVM_VHT_SNP_POLICY:
+                policy = IGVM_VHS_SNP_POLICY.from_buffer_copy(
+                    raw, offset + sizeof(varheader))
+                policy = policy.Policy
+                print("%x" % policy)
+                header_ = IGVMHeaders(0, policy)
+            if varheader.Type == IGVM_VHT_VP_CONTEXT:
+                context = IGVM_VHS_VP_CONTEXT.from_buffer_copy(
+                    raw, offset + sizeof(varheader))
+                header_.add_vmsa_page(context.GPA, raw[context.FileOffset:context.FileOffset + PGSIZE])
+            if varheader.Type == IGVM_VHT_PARAMETER_INSERT:
+                param = IGVM_VHS_PARAMETER_INSERT.from_buffer_copy(
+                    raw, offset + sizeof(varheader))
+                header_.add_param_page(param.GPA, zeropage)
+            if varheader.Type == IGVM_VHT_PAGE_DATA:
+                data = IGVM_VHS_PAGE_DATA.from_buffer_copy(raw, offset + sizeof(varheader))
+                if data.DataType == IGVM_VHS_PAGE_DATA_TYPE_CPUID_DATA:
+                    header_.add_cpuid_page(data.GPA, raw[data.FileOffset:data.FileOffset + PGSIZE])
+                elif data.DataType == IGVM_VHS_PAGE_DATA_TYPE_SECRETS:
+                    header_.add_secret_page(data.GPA, raw[data.FileOffset:data.FileOffset + PGSIZE])
+                elif data.DataType == IGVM_VHS_PAGE_DATA_TYPE_NORMAL:
+                    if data.Flags & IGVM_VHF_PAGE_DATA_UNMEASURED:
+                        print("unmeasured")
+                        header_.add_unmeasured_normal_page(data.GPA, raw[data.FileOffset:data.FileOffset + PGSIZE])
+                    elif data.Flags & IGVM_VHF_PAGE_DATA_GUEST_INVALID:
+                        print("invalid")
+                    else:
+                        if data.FileOffset:
+                            page = raw[data.FileOffset:data.FileOffset + PGSIZE]
+                        else:
+                            page = zeropage
+                        header_.add_measured_normal_page(data.GPA, page)
+
+            if varheader.Type == IGVM_VHT_SNP_ID_BLOCK:
+                id_block = IGVM_VHS_SNP_ID_BLOCK.from_buffer_copy( raw, offset + sizeof(varheader))
+
             if varheader.Type in IGVM_HMAP:
                 header_class = IGVM_HMAP[varheader.Type]
                 header_name = IGVM_VARIABLE_HEADER_TYPES__enumvalues[varheader.Type]
@@ -430,7 +470,14 @@ class IGVMHeaders:
                     f'IGVM_VHT_VP_CONTEXT({offset:02x})' + dumps(context) + dumps(vmsa))
             offset += sizeof(IGVM_VHS_VARIABLE_HEADER) + varheader.Length
             offset = (offset + 7) & ~7
-        return "\n".join(ans)
+        out = "\n".join(ans)
+        if id_block:
+            out += "\nid block ld: "
+            out += "".join("{:02x}".format(b) for b in id_block.Ld)
+        if header_:
+            out += "\ncomputed measurement: "
+            out += "".join("{:02x}".format(b) for b in header_.curr_digest)
+        return out
 
 
 class IGVMFile(VMState):
