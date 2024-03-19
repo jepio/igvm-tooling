@@ -435,7 +435,7 @@ class IGVMHeaders:
                 if data.DataType == IGVM_VHS_PAGE_DATA_TYPE_CPUID_DATA:
                     header_.add_cpuid_page(data.GPA, raw[data.FileOffset:data.FileOffset + PGSIZE])
                 elif data.DataType == IGVM_VHS_PAGE_DATA_TYPE_SECRETS:
-                    header_.add_secret_page(data.GPA, raw[data.FileOffset:data.FileOffset + PGSIZE])
+                    header_.add_secret_page(data.GPA, zeropage)
                 elif data.DataType == IGVM_VHS_PAGE_DATA_TYPE_NORMAL:
                     if data.Flags & IGVM_VHF_PAGE_DATA_UNMEASURED:
                         print("unmeasured")
